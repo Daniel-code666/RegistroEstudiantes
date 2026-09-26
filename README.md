@@ -1,74 +1,165 @@
-# Registro de estudiantes — backend
+﻿# Registro de estudiantes — backend
 
-Solución .NET 10 con ASP.NET Core, Entity Framework Core y SQL Server, organizada en Domain, Application, Infrastructure y API.
+API de registro académico desarrollada con .NET 10, ASP.NET Core, Entity Framework Core, SQL Server y AutoMapper. El frontend asociado utiliza Angular 21.
 
-## Estado de la revisión
+## Estructura
 
-Se revisó el documento `PRUEBA TECNICA APLICACION WEB (1) (1) (1) (1) (2) (1).md` de la carpeta de la prueba técnica de Interrapidísimo, el 25 de septiembre de 2026.
-
-El proyecto es una estructura inicial: compila y permite abrir Swagger, pero **aún no implementa operaciones de negocio**. Los controladores, interfaces, servicios y repositorios existentes son esqueletos. Que Swagger abra o las pruebas pasen no significa que el CRUD esté implementado.
-
-| Requisito del documento | Estado actual / trabajo pendiente |
+| Proyecto o carpeta | Responsabilidad |
 | --- | --- |
-| CRUD para registro en línea | Existe `User`; faltan contratos de entrada/salida, validaciones y operaciones HTTP con persistencia. |
-| Adhesión a un programa de créditos | Falta definir y representar la matrícula; el documento no define varios programas académicos. |
-| 10 materias, cada una de 3 créditos | Existe `Subject`, pero faltan datos iniciales y restricciones que garanticen esos valores. |
-| Selección de 3 materias | Existe relación muchos a muchos; falta validar cantidad, duplicados y materias existentes/activas. |
-| 5 profesores, cada uno dicta 2 materias | Faltan entidad profesor, relación con materias y catálogo inicial. |
-| No repetir profesor en las materias elegidas | Falta validación de matrícula, tanto al crear como al actualizar. |
-| Ver registros de otros estudiantes | Falta consulta pública con respuesta limitada a los datos permitidos. |
-| Ver solo nombres de compañeros por clase | Falta consulta por materia, filtrada por matrícula del estudiante y excluyendo al propio estudiante; no exponer documentos ni correos. |
-| Base de datos o scripts MySQL / SQL | Se configuró el proveedor SQL Server; faltan migraciones, datos iniciales y script entregable. |
-| Aplicación web o cliente-servidor y entregables adjuntos | El frontend y el empaquetado de entrega quedan fuera de esta revisión del backend. |
+| RegistroEstudiante.Domain | Entidades y constantes del negocio. |
+| RegistroEstudiante.Application | Servicios, DTO, validaciones, interfaces y perfiles de AutoMapper. |
+| RegistroEstudiante.Infrastructure | Repositorios, DbContext, configuraciones y migraciones. |
+| RegistroEstudianteBack | Controladores, autenticación JWT, Swagger, errores y salud. |
+| RegistroEstudiante.Tests | Pruebas del modelo, auditoría, dependencias, paginación y mapeos. |
+| database | Scripts SQL del esquema. |
+| scripts | Preparación de variables para Docker Compose. |
 
-### Decisiones que conviene fijar al implementar
+Los servicios siguen un flujo directo: validar, mapear, modificar las entidades y guardar. No existen envoltorios personalizados de transacciones ni aislamiento serializable entre validación y guardado. EF Core conserva su comportamiento transaccional normal en SaveChanges; las validaciones previas no garantizan las reglas entre solicitudes simultáneas.
 
-- “Sólo podrá seleccionar 3 materias” puede significar máximo tres o exactamente tres. Propuesta: permitir hasta tres durante la selección y exigir tres al confirmar la matrícula (9 créditos). El documento no especifica un flujo de borrador.
-- La consulta de otros registros no debe devolver directamente la entidad `User`. Usar DTO específicos; para compañeros, únicamente nombres.
-- El documento no exige login explícitamente. Si se requiere que cada estudiante solo modifique su registro y consulte sus propias clases, debe existir una identidad verificada; un ID enviado por el cliente no basta.
-- No se solicitan CRUD de roles ni administración libre de catálogos. Las clases actuales de roles no cubren ningún requisito obligatorio por sí solas.
+AutoMapper centraliza las conversiones en `RegistroEstudiante.Application/Mapping/ApplicationAppProfile.cs`. Los identificadores del usuario autenticado se obtienen del token.
 
-## Correcciones realizadas
+## Funcionalidades y roles
 
-- Referencias entre proyectos y dependencias NuGet explícitas; incorporación de todas las capas y pruebas a la solución.
-- Uso del enum existente `TipoIdentificacion` e inicialización válida de `User.Subjects` sin elementos nulos.
-- Relación muchos a muchos mediante `StudentSubjects`, evitando que una materia pertenezca a un solo estudiante.
-- Auditoría mediante propiedades de EF, conservando los setters privados y la fecha de creación al actualizar; aplicación efectiva de las configuraciones de fechas a las tres entidades.
-- Registro en inyección de dependencias de los servicios requeridos por los controladores.
-- Corrección del arranque y Swagger: imports, paquete, generación XML, eliminación de `MapOpenApi` sin registro de servicios y textos ajenos al proyecto.
-- Protección al habilitar inicialización de BD sin migraciones: se informa el problema en vez de anunciar una base lista sin tablas.
-- Dockerfile actualizado para copiar los proyectos referenciados antes de restaurar.
-- Archivo HTTP actualizado a rutas existentes y `.gitignore` para artefactos locales. Esta carpeta no tenía repositorio Git al revisarla.
+- **Student:** registro público, perfil, cambio de contraseña, inscripción de materias, consulta de estudiantes y compañeros.
+- **Professor:** gestión de sus materias, asignación de materias disponibles y consulta de alumnos.
+- **Admin:** administración de usuarios, roles, materias e inscripciones de estudiantes.
 
-## Ejecutar
+Los roles adicionales no reciben automáticamente los permisos anteriores. Eliminar usuarios, roles o materias los desactiva; retirar una materia elimina la relación de inscripción.
 
-Requiere SDK .NET 10. Para persistencia se necesita una instancia accesible de SQL Server. No se incluyen credenciales.
+La autenticación usa JWT y verifica vigencia, estado del usuario y rol y versión del token. Cambiar o restablecer una contraseña invalida los tokens anteriores.
+
+## Modelo y reglas académicas
+
+- User representa estudiantes, profesores y administradores, diferenciados por Role.
+- Subject representa una materia y su profesor opcional.
+- StudentSubject relaciona estudiantes con materias mediante una clave compuesta.
+- Cada materia tiene **3 créditos**.
+- Un estudiante puede guardar **entre 0 y 3 materias**, sin duplicados y con profesores diferentes.
+- Las materias y profesores seleccionados deben estar activos. Una materia sin profesor no admite inscripciones.
+- Un profesor puede tener **hasta 2 materias activas**.
+- No se permite desactivar o desasignar materias con estudiantes inscritos.
+- Los compañeros se consultan solo para materias del estudiante. La respuesta contiene nombres y excluye al propio estudiante.
+
+Las migraciones incluyen **10 materias y 5 profesores iniciales**. La administración puede ampliar el catálogo; esas cantidades no son límites globales. Los profesores iniciales se convierten en usuarios con datos provisionales y sin contraseña utilizable: deben completarse sus datos y restablecerse sus contraseñas desde administración.
+
+El enunciado indica que el estudiante selecciona tres materias. La implementación interpreta esta regla como un máximo de tres, con hasta nueve créditos, y permite guardar una inscripción vacía.
+
+## Ejecutar con Docker Compose
+
+Requiere Docker con soporte para contenedores Linux. Desde la raíz del backend:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\init-docker.ps1
+docker compose up --build -d
+docker compose ps
+```
+
+El script crea `.env` con credenciales aleatorias de SQL Server, clave JWT y datos del administrador inicial. Si existe, lo conserva. No publicar este archivo.
+
+Antes de iniciar, configurar `FRONTEND_PATH` en `.env` si la ubicación del proyecto Angular difiere de la ruta local incluida en compose.yaml:
+
+```dotenv
+FRONTEND_PATH=C:/ruta/al/Front/RegistroEstudiante
+```
+
+| Servicio | Dirección predeterminada |
+| --- | --- |
+| Frontend | http://localhost:5089 |
+| Swagger | http://localhost:5088/swagger |
+| Salud | http://localhost:5088/health |
+| SQL Server | localhost,14334 |
+
+Compose aplica las migraciones al arrancar la API y conserva los datos en el volumen sqlserver_data. Las credenciales del administrador están en `BOOTSTRAP_ADMIN_EMAIL` y `BOOTSTRAP_ADMIN_PASSWORD` dentro de `.env`. Solo se crea si no existe ningún administrador; no reemplaza credenciales existentes.
+
+## Ejecutar el backend sin Docker
+
+Requiere SDK .NET 10 y una instancia accesible de SQL Server. Desde la raíz del backend:
 
 ```powershell
 dotnet restore RegistroEstudianteBack.slnx
-dotnet build RegistroEstudianteBack.slnx -c Release --no-restore
-dotnet test RegistroEstudianteBack.slnx -c Release --no-restore
+dotnet build RegistroEstudianteBack.slnx --no-restore
 
-# Adaptar servidor/autenticación al entorno real.
+# Adaptar la conexión a la instancia local.
 $env:ConnectionStrings__DefaultConnection = 'Server=localhost;Database=RegistroEstudiantes;Integrated Security=true;TrustServerCertificate=true'
+
+# Generar una clave para esta sesión; mantenerla estable para conservar los tokens.
+$jwtBytes = New-Object byte[] 48
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+try { $rng.GetBytes($jwtBytes) } finally { $rng.Dispose() }
+$env:Jwt__SigningKey = [Convert]::ToBase64String($jwtBytes)
+
+$env:Database__InitializeOnStartup = 'true'
+$env:Http__UseHttpsRedirection = 'false'
 dotnet run --project RegistroEstudianteBack --launch-profile http
 ```
 
-Swagger: `http://localhost:5010/swagger`. La cadena de conexión es obligatoria; se puede suministrar también mediante User Secrets en desarrollo. `TrustServerCertificate=true` en el ejemplo es para desarrollo local.
+El perfil HTTP utiliza **http://localhost:5010**, con Swagger en `/swagger`. La cadena de conexión y clave JWT son obligatorias; también pueden configurarse mediante User Secrets. La clave debe tener al menos 32 bytes. TrustServerCertificate en el ejemplo corresponde al desarrollo local.
 
-`Database:InitializeOnStartup` permanece desactivado por defecto. No activarlo hasta crear las migraciones. `/health` comprueba acceso a la tabla de usuarios y migraciones pendientes: responde 503 si la BD no está disponible o no tiene el esquema requerido. Abrir Swagger no requiere conectarse a la BD.
+La inicialización de base de datos está desactivada si no se configura Database:InitializeOnStartup. Como alternativa a migrar al arrancar, `database/RegistroEstudiantes.sql` contiene el historial completo del esquema. `database/InitialAuthentication.sql` contiene solo el esquema inicial de autenticación.
 
-## Verificación y límites
+Para crear un administrador local, configurar antes del arranque `BootstrapAdmin__Enabled=true` y las variables `BootstrapAdmin__Email`, `BootstrapAdmin__Password`, `BootstrapAdmin__Name`, `BootstrapAdmin__LastName`, `BootstrapAdmin__IdentificationType` y `BootstrapAdmin__IdentificationNumber`, con valores que cumplan las validaciones de usuarios.
 
-- Compilación Release: cero errores y advertencias.
-- Siete pruebas automatizadas: modelo muchos a muchos, auditoría síncrona/asíncrona, resolución de servicios y validación de paginación incluyendo desbordamiento.
-- Arranque HTTP y documento/UI Swagger comprobados localmente. El documento no contiene operaciones de negocio porque los controladores todavía no tienen acciones.
-- Las pruebas de auditoría interceptan la escritura: no validan persistencia real en SQL Server. No se ejecutaron migraciones, pruebas contra una BD real ni una compilación de imagen Docker.
+### Conexión con el frontend
 
-## Orden propuesto para completar el backend
+El frontend utiliza rutas relativas `/api`. Su proxy de desarrollo apunta a **http://localhost:5088**, el puerto de Compose. Para ejecutar la API con el perfil local, cambiar el destino de `proxy.conf.json` del frontend a **http://localhost:5010**.
 
-1. Modelar profesor y matrícula, fijar reglas y crear catálogo de 10 materias/5 profesores.
-2. Implementar CRUD con DTO, validaciones y manejo de recursos inexistentes/conflictos.
-3. Implementar inscripción atómica y validar cantidad de materias y profesores distintos también en actualizaciones.
-4. Implementar consultas de registros y compañeros con las restricciones de información.
-5. Crear migraciones/script SQL y probar CRUD, reglas de matrícula y privacidad contra SQL Server.
+Los orígenes CORS predeterminados son http://localhost:4200 y http://localhost:5173; se configuran en Cors:AllowedOrigins.
+
+## Endpoints consumidos por el frontend
+
+Todas las rutas siguientes llevan el prefijo `/api`. Salvo login y registro, requieren autenticación y los permisos definidos en cada controlador.
+
+| Ruta | Métodos y propósito |
+| --- | --- |
+| `/auth/login` | POST: iniciar sesión. |
+| `/users/register` | POST: registrar estudiante. |
+| `/users/me` | GET: recuperar sesión/perfil; PUT: editar perfil. |
+| `/users/me/password` | PUT: cambiar contraseña propia. |
+| `/users` | GET: listar usuarios y profesores; POST: crear usuario. |
+| `/users/{id}` | GET: consultar estudiante para administrar inscripción; PUT: editar; DELETE: desactivar. |
+| `/users/{id}/activate` | PATCH: reactivar usuario. |
+| `/users/{id}/password` | PUT: restablecer contraseña. |
+| `/Role` | GET: listar roles y llenar selectores; POST: crear rol. |
+| `/Role/{id}` | PUT: editar; DELETE: desactivar. |
+| `/Role/{id}/activate` | PATCH: reactivar rol. |
+| `/Subject` | GET: listar catálogo; POST: crear materia. |
+| `/Subject/{id}` | GET: consultar detalle; PUT: editar; DELETE: desactivar. |
+| `/Subject/{id}/activate` | PATCH: reactivar materia. |
+| `/students` | GET: consultar nombres de estudiantes y materias inscritas. |
+| `/enrollments/me` | GET: consultar inscripción propia; PUT: guardar selección completa. |
+| `/enrollments/{userId}` | GET y PUT: consultar y actualizar inscripción desde administración. |
+| `/enrollments/me/{subjectId}` | DELETE: retirar materia propia. |
+| `/enrollments/{userId}/{subjectId}` | DELETE: retirar materia desde administración. |
+| `/enrollments/me/{subjectId}/classmates` | GET: consultar compañeros de materia propia. |
+| `/enrollments/{userId}/{subjectId}/classmates` | GET: consultar compañeros desde administración. |
+| `/professors/me/subjects` | GET: listar materias propias; POST: crear materia. |
+| `/professors/me/subjects/available` | GET: listar materias disponibles. |
+| `/professors/me/subjects/{id}` | PUT: editar materia propia; DELETE: desactivar. |
+| `/professors/me/subjects/{id}/activate` | PATCH: reactivar materia propia. |
+| `/professors/me/subjects/{id}/assignment` | PUT: asignarse materia; DELETE: desasignarse. |
+| `/professors/me/subjects/{subjectId}/students` | GET: consultar nombres de alumnos. |
+
+La inscripción se guarda con PUT y un cuerpo como `{"subjectIds":[1,3,5]}`. Una lista vacía retira todas las materias. No existen endpoints POST de inscripción individual ni GET de rol por ID.
+
+Los listados paginados aceptan PageNumber y PageSize (entre 1 y 100). Roles devuelve una lista completa y el frontend la pagina localmente.
+
+## Archivos HTTP para pruebas manuales
+
+- `RegistroEstudianteBack/RegistroEstudianteBack.http`: Swagger, salud, registro, login, perfil y usuarios. Host inicial en el puerto 5010.
+- `RegistroEstudianteBack/Academic.http`: roles, materias e inscripciones. Host inicial en el puerto 5088.
+- `RegistroEstudianteBack/Professors.http`: operaciones del profesor.
+
+Se ejecutan desde un editor compatible con solicitudes HTTP. Ajustar host, identificadores y tokens. Son ejemplos para pruebas manuales: no los consume el frontend ni son necesarios para ejecutar la aplicación.
+
+`/health` comprueba acceso a la tabla de usuarios y migraciones pendientes; devuelve 503 si la base no está disponible o el esquema no está listo. Docker utiliza esta comprobación. `/` redirige a Swagger.
+
+## Pruebas y alcance de la verificación
+
+```powershell
+dotnet build RegistroEstudianteBack.slnx --no-restore
+dotnet test RegistroEstudianteBack.slnx --no-build --no-restore
+```
+
+Última verificación del código: compilación sin errores ni advertencias y **8 casos de prueba aprobados**. Cubren relaciones del modelo, auditoría síncrona y asíncrona, resolución de dependencias, límites de paginación y configuración de AutoMapper.
+
+Estas pruebas no verifican persistencia real en SQL Server ni todos los flujos funcionales. La actualización de este documento no implica una nueva ejecución de Docker o una prueba completa desde el navegador.
