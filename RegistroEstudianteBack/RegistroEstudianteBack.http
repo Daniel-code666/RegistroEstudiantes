@@ -1,0 +1,112 @@
+@RegistroEstudianteBack_HostAddress = http://localhost:5010
+
+GET {{RegistroEstudianteBack_HostAddress}}/swagger/v1/swagger.json
+Accept: application/json
+
+###
+
+GET {{RegistroEstudianteBack_HostAddress}}/health
+
+### Registro público: siempre crea un estudiante
+POST {{RegistroEstudianteBack_HostAddress}}/api/users/register
+Content-Type: application/json
+
+{
+  "name": "Ana",
+  "lastName": "Perez",
+  "email": "ana@example.test",
+  "password": "Ejemplo-local-123!",
+  "identificationType": "CedulaCiudadania",
+  "identificationNumber": "100000001"
+}
+
+### Login: devuelve accessToken, tokenType, expiresAtUtc y user
+POST {{RegistroEstudianteBack_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "ana@example.test",
+  "password": "Ejemplo-local-123!"
+}
+
+### Copiar el accessToken del login
+@accessToken = REEMPLAZAR_POR_EL_TOKEN
+
+GET {{RegistroEstudianteBack_HostAddress}}/api/users/me
+Authorization: Bearer {{accessToken}}
+
+### Solo Admin (Student recibe 403)
+GET {{RegistroEstudianteBack_HostAddress}}/api/Role
+Authorization: Bearer {{accessToken}}
+
+### Modificar mi perfil (no acepta cambios de rol o estado)
+PUT {{RegistroEstudianteBack_HostAddress}}/api/users/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Ana Maria",
+  "lastName": "Perez",
+  "email": "ana@example.test",
+  "identificationType": "CedulaCiudadania",
+  "identificationNumber": "100000001"
+}
+
+### Cambiar mi contraseña: el token actual deja de ser válido
+PUT {{RegistroEstudianteBack_HostAddress}}/api/users/me/password
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "Ejemplo-local-123!",
+  "newPassword": "Nueva-clave-local-456!"
+}
+
+### Token obtenido mediante login de un administrador
+@adminToken = REEMPLAZAR_POR_TOKEN_ADMIN
+@userId = 1
+
+### Listar usuarios; filtros opcionales Search, Role y Active
+GET {{RegistroEstudianteBack_HostAddress}}/api/users?PageNumber=1&PageSize=20&Role=Professor&Active=true
+Authorization: Bearer {{adminToken}}
+
+### Consultar un usuario
+GET {{RegistroEstudianteBack_HostAddress}}/api/users/{{userId}}
+Authorization: Bearer {{adminToken}}
+
+### Crear un profesor (solo Admin)
+POST {{RegistroEstudianteBack_HostAddress}}/api/users
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Laura",
+  "lastName": "Lopez",
+  "email": "laura@example.test",
+  "password": "Clave-profesor-123!",
+  "identificationType": "CedulaCiudadania",
+  "identificationNumber": "100000002",
+  "role": "Professor"
+}
+
+### Actualizar datos y rol de un usuario
+PUT {{RegistroEstudianteBack_HostAddress}}/api/users/{{userId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Laura",
+  "lastName": "Lopez",
+  "email": "laura@example.test",
+  "identificationType": "CedulaCiudadania",
+  "identificationNumber": "100000002",
+  "role": "Professor"
+}
+
+### Desactivar conservando los datos
+DELETE {{RegistroEstudianteBack_HostAddress}}/api/users/{{userId}}
+Authorization: Bearer {{adminToken}}
+
+### Reactivar
+PATCH {{RegistroEstudianteBack_HostAddress}}/api/users/{{userId}}/activate
+Authorization: Bearer {{adminToken}}

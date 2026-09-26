@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="RegistroEstudiante.Tests/RegistroEstudiante.Tests.csproj" />
+  <Project Path="RegistroEstudiante.Domain/RegistroEstudiante.Domain.csproj" />
+  <Project Path="RegistroEstudiante.Application/RegistroEstudiante.Application.csproj" />
+  <Project Path="RegistroEstudiante.Infrastructure/RegistroEstudiante.Infrastructure.csproj" />
+
+  <Project Path="RegistroEstudianteBack/RegistroEstudianteBack.csproj" />
+</Solution>

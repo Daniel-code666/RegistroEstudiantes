@@ -1,0 +1,64 @@
+@host = http://localhost:5088
+@adminToken = REEMPLAZAR
+@professorToken = REEMPLAZAR
+@userId = 1
+@subjectId = 1
+
+### El administrador identifica al usuario y asigna una nueva clave.
+### Sirve para recuperar acceso y para habilitar las credenciales iniciales.
+### No activa cuentas ni cambia correos. Los tokens anteriores quedan invalidados.
+PUT {{host}}/api/users/{{userId}}/password
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "newPassword": "REEMPLAZAR_POR_UNA_CLAVE_NUEVA"
+}
+
+### Antes del primer acceso de un profesor inicial, actualizar su correo
+### y sus datos mediante PUT /api/users/{id}. Luego usar POST /api/auth/login.
+
+### Materias del profesor autenticado
+GET {{host}}/api/professors/me/subjects?pageNumber=1&pageSize=20
+Authorization: Bearer {{professorToken}}
+
+### Nombres de los alumnos activos inscritos en una materia propia
+GET {{host}}/api/professors/me/subjects/{{subjectId}}/students?pageNumber=1&pageSize=20
+Authorization: Bearer {{professorToken}}
+
+### Catálogo flexible: máximo 2 materias activas por profesor, 3 créditos por materia.
+### Las materias sin profesor no admiten inscripciones.
+
+### Materias disponibles para asignarse
+GET {{host}}/api/professors/me/subjects/available?pageNumber=1&pageSize=20
+Authorization: Bearer {{professorToken}}
+
+### Crear materia propia
+POST {{host}}/api/professors/me/subjects
+Authorization: Bearer {{professorToken}}
+Content-Type: application/json
+
+{ "name": "Nueva materia", "description": "Descripción", "credits": 3 }
+
+### Editar materia propia
+PUT {{host}}/api/professors/me/subjects/{{subjectId}}
+Authorization: Bearer {{professorToken}}
+Content-Type: application/json
+
+{ "name": "Materia actualizada", "description": "Descripción", "credits": 3 }
+
+### Asignarse una materia activa sin profesor
+PUT {{host}}/api/professors/me/subjects/{{subjectId}}/assignment
+Authorization: Bearer {{professorToken}}
+
+### Desasignarse: no debe tener alumnos inscritos
+DELETE {{host}}/api/professors/me/subjects/{{subjectId}}/assignment
+Authorization: Bearer {{professorToken}}
+
+### Desactivar materia propia: no debe tener alumnos inscritos
+DELETE {{host}}/api/professors/me/subjects/{{subjectId}}
+Authorization: Bearer {{professorToken}}
+
+### Reactivar materia propia
+PATCH {{host}}/api/professors/me/subjects/{{subjectId}}/activate
+Authorization: Bearer {{professorToken}}

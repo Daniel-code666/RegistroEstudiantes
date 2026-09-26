@@ -1,0 +1,71 @@
+name: registroestudiante
+
+services:
+  front:
+    image: registroestudiante-front:local
+    build:
+      context: ${FRONTEND_PATH:-C:/Users/Administrador/OneDrive/Documentos/Documentos/Certificaciones y docs/Laboral/Interrapidisimo/Front/RegistroEstudiante}
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-5089}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${SQL_SERVER_PASSWORD:?Ejecute scripts/init-docker.ps1}
+    ports:
+      - "127.0.0.1:${SQL_SERVER_PORT:-14334}:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'SQLCMDPASSWORD="$$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -l 3 -Q "SELECT 1" > /dev/null'
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    restart: unless-stopped
+
+  api:
+    image: registroestudiante-api:local
+    build:
+      context: .
+      dockerfile: RegistroEstudianteBack/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      Http__UseHttpsRedirection: "false"
+      Cors__AllowedOrigins__0: ${FRONTEND_ORIGIN:-http://localhost:4200}
+      Cors__AllowedOrigins__1: ${FRONTEND_SECONDARY_ORIGIN:-http://localhost:5173}
+      ConnectionStrings__DefaultConnection: 'Server=db,1433;Database=RegistroEstudiantes;User Id=sa;Password="${SQL_SERVER_PASSWORD:?Ejecute scripts/init-docker.ps1}";Encrypt=True;TrustServerCertificate=True'
+      Database__InitializeOnStartup: "true"
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Ejecute scripts/init-docker.ps1}
+      BootstrapAdmin__Enabled: ${BOOTSTRAP_ADMIN_ENABLED:-false}
+      BootstrapAdmin__Email: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      BootstrapAdmin__Name: ${BOOTSTRAP_ADMIN_NAME:-Administrador}
+      BootstrapAdmin__LastName: ${BOOTSTRAP_ADMIN_LAST_NAME:-Inicial}
+      BootstrapAdmin__IdentificationType: ${BOOTSTRAP_ADMIN_IDENTIFICATION_TYPE:-Pasaporte}
+      BootstrapAdmin__IdentificationNumber: ${BOOTSTRAP_ADMIN_IDENTIFICATION_NUMBER:-BOOTSTRAP-ADMIN}
+    ports:
+      - "127.0.0.1:${API_PORT:-5088}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "dotnet", "RegistroEstudianteBack.dll", "--healthcheck"]
+      interval: 15s
+      timeout: 6s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  sqlserver_data:

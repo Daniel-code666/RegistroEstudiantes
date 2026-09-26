@@ -1,0 +1,114 @@
+@host = http://localhost:5088
+@adminToken = REEMPLAZAR_POR_TOKEN_ADMIN
+@studentToken = REEMPLAZAR_POR_TOKEN_STUDENT
+@roleId = 4
+@subjectId = 1
+@professorId = 1
+@studentId = 6
+
+### Roles: solo administradores
+GET {{host}}/api/Role
+Authorization: Bearer {{adminToken}}
+
+### Crear un rol adicional
+POST {{host}}/api/Role
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Consulta",
+  "description": "Usuario con acceso a consultas generales"
+}
+
+### Actualizar descripción del rol
+PUT {{host}}/api/Role/{{roleId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Consulta",
+  "description": "Acceso a consultas generales del programa"
+}
+
+### Desactivar: se rechazan roles del sistema o asignados a usuarios
+DELETE {{host}}/api/Role/{{roleId}}
+Authorization: Bearer {{adminToken}}
+
+### Reactivar
+PATCH {{host}}/api/Role/{{roleId}}/activate
+Authorization: Bearer {{adminToken}}
+
+### Catálogo paginado de materias activas
+GET {{host}}/api/Subject?PageNumber=1&PageSize=20
+Authorization: Bearer {{studentToken}}
+
+### Detalle de materia
+GET {{host}}/api/Subject/{{subjectId}}
+Authorization: Bearer {{studentToken}}
+
+### Crear materia: máximo 2 materias activas por profesor; professorId admite null
+POST {{host}}/api/Subject
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Nueva materia",
+  "description": "Descripción de la materia",
+  "credits": 3,
+  "professorId": {{professorId}}
+}
+
+### Actualizar: el profesor debe ser un User activo con rol Professor
+PUT {{host}}/api/Subject/{{subjectId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Matemáticas",
+  "description": "Fundamentos de matemáticas",
+  "credits": 3,
+  "professorId": {{professorId}}
+}
+
+### Desactivar: no debe tener inscripciones
+DELETE {{host}}/api/Subject/{{subjectId}}
+Authorization: Bearer {{adminToken}}
+
+### Reactivar: vuelve a validar el profesor asignado y su capacidad
+PATCH {{host}}/api/Subject/{{subjectId}}/activate
+Authorization: Bearer {{adminToken}}
+
+### Mis materias y total de créditos
+GET {{host}}/api/enrollments/me
+Authorization: Bearer {{studentToken}}
+
+### Reemplazar mi selección completa; [] permite retirar todas las materias
+PUT {{host}}/api/enrollments/me
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+{ "subjectIds": [1, 3, 5] }
+
+### Retirar una materia
+DELETE {{host}}/api/enrollments/me/{{subjectId}}
+Authorization: Bearer {{studentToken}}
+
+### Compañeros: solo nombres y solo si estoy inscrito en esa materia
+GET {{host}}/api/enrollments/me/{{subjectId}}/classmates?PageNumber=1&PageSize=20
+Authorization: Bearer {{studentToken}}
+
+### Registros de estudiantes: nombres y materias, sin datos privados
+GET {{host}}/api/students?PageNumber=1&PageSize=20
+Authorization: Bearer {{studentToken}}
+
+### Administración de inscripciones de un estudiante
+GET {{host}}/api/enrollments/{{studentId}}
+Authorization: Bearer {{adminToken}}
+
+### Reemplazar la selección del estudiante: PUT /api/enrollments/{studentId}
+### Para retirar una materia: DELETE /api/enrollments/{studentId}/{subjectId}
+PUT {{host}}/api/enrollments/{{studentId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "subjectIds": [1, 3, 5] }
