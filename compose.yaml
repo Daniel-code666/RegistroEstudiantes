@@ -44,7 +44,7 @@ services:
       Http__UseHttpsRedirection: "false"
       Cors__AllowedOrigins__0: ${FRONTEND_ORIGIN:-http://localhost:4200}
       Cors__AllowedOrigins__1: ${FRONTEND_SECONDARY_ORIGIN:-http://localhost:5173}
-      ConnectionStrings__DefaultConnection: 'Server=db,1433;Database=RegistroEstudiantes;User Id=sa;Password="${SQL_SERVER_PASSWORD:?Ejecute scripts/init-docker.ps1}";Encrypt=True;TrustServerCertificate=True'
+      ConnectionStrings__DefaultConnection: ${SQL_CONNECTION_STRING_DOCKER:?Configure SQL_CONNECTION_STRING_DOCKER en .env}
       Database__InitializeOnStartup: "true"
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?Ejecute scripts/init-docker.ps1}
       BootstrapAdmin__Enabled: ${BOOTSTRAP_ADMIN_ENABLED:-false}

@@ -21,6 +21,7 @@ if (args.Contains("--healthcheck"))
     return;
 }
 
+RegistroEstudiante.Infrastructure.Configuration.LocalEnvironment.Load();
 var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 

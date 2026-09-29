@@ -7,6 +7,7 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
 {
     public ApplicationDbContext CreateDbContext(string[] args)
     {
+        Configuration.LocalEnvironment.Load();
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
             ?? "Server=(localdb)\\MSSQLLocalDB;Database=RegistroEstudiantes;Integrated Security=true;TrustServerCertificate=true";
         var options = new DbContextOptionsBuilder<ApplicationDbContext>();

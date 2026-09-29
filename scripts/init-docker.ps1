@@ -21,6 +21,8 @@ $adminPassword = 'Admin1!' + (New-RandomHex 20)
 $content = @(
     "SQL_SERVER_PASSWORD=$sqlPassword"
     "JWT_SIGNING_KEY=$jwtKey"
+    ('ConnectionStrings__DefaultConnection=''Server=localhost,14334;Database=RegistroEstudiantes;User Id=sa;Password="{0}";Encrypt=True;TrustServerCertificate=True''' -f $sqlPassword)
+    ('SQL_CONNECTION_STRING_DOCKER=''Server=db,1433;Database=RegistroEstudiantes;User Id=sa;Password="{0}";Encrypt=True;TrustServerCertificate=True''' -f $sqlPassword)
     'API_PORT=5088'
     'SQL_SERVER_PORT=14334'
     'BOOTSTRAP_ADMIN_ENABLED=true'

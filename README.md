@@ -163,3 +163,27 @@ dotnet test RegistroEstudianteBack.slnx --no-build --no-restore
 Última verificación del código: compilación sin errores ni advertencias y **8 casos de prueba aprobados**. Cubren relaciones del modelo, auditoría síncrona y asíncrona, resolución de dependencias, límites de paginación y configuración de AutoMapper.
 
 Estas pruebas no verifican persistencia real en SQL Server ni todos los flujos funcionales. La actualización de este documento no implica una nueva ejecución de Docker o una prueba completa desde el navegador.
+
+## Configuración centralizada en .env
+
+El backend carga el .env ubicado junto a RegistroEstudianteBack.slnx al arrancar con dotnet run o Visual Studio (perfiles http/https). La fábrica de DbContext también lo carga para las herramientas de EF Core. En Docker no se carga un archivo dentro de la imagen: Compose inyecta los valores.
+
+- ConnectionStrings__DefaultConnection: cadena completa para ejecución local.
+- SQL_CONNECTION_STRING_DOCKER: cadena completa que ambos Compose pasan a la API.
+- JWT_SIGNING_KEY: única clave JWT compartida entre ambos modos; localmente se reconoce como Jwt__SigningKey.
+
+| Destino SQL Server | Servidor local | Servidor desde Docker |
+| --- | --- | --- |
+| Contenedor independiente actual | localhost,14335 | host.docker.internal,14335 |
+| Servicio db del Compose original | localhost,14334 | db,1433 |
+| Servidor remoto | servidor,puerto | servidor,puerto |
+
+Escribe las cadenas completas en .env con credenciales reales, entre comillas simples. Los valores son literales: no uses referencias a otras variables como ${SQL_SERVER_PASSWORD}, escapes o valores multilínea. Al cambiar de base modifica ambas cadenas, incluyendo usuario, contraseña y configuración de certificado. JWT no necesita cambiar.
+
+Las variables ya definidas en el proceso tienen prioridad sobre .env. Las variables cargadas tienen prioridad sobre appsettings y User Secrets. Reinicia la aplicación local o ejecuta docker compose up -d para aplicar cambios. Visual Studio debe ejecutar el proyecto API con http/https para el modo local.
+
+El Compose original continúa creando su servicio db aunque la cadena apunte a otra base; el alternativo solo crea front y api. SQL_SERVER_PASSWORD sigue siendo necesaria para el servicio db del Compose original, pero ya no construye la conexión de la API.
+
+La conexión local y JWT se cargan automáticamente. Para opciones locales adicionales usa los nombres de configuración estándar: Database__InitializeOnStartup=true aplica migraciones, Http__UseHttpsRedirection=false permite HTTP sin redirección y BootstrapAdmin__Enabled controla la creación inicial. Los nombres BOOTSTRAP_ADMIN_* siguen siendo traducciones del Compose; no se habilitan automáticamente en local.
+
+El .env no se copia a las imágenes ni debe versionarse. scripts/init-docker.ps1 conserva archivos existentes y genera ambas conexiones para el Compose original al crear uno nuevo.
